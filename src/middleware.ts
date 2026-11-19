@@ -33,6 +33,9 @@ export async function middleware(request: NextRequest) {
             if (profile?.app_role === 'admin') return NextResponse.redirect(new URL('/admin/team', request.url));
             if (profile?.app_role === 'ops') return NextResponse.redirect(new URL('/ops/calendar', request.url));
             if (profile?.app_role === 'crew') return NextResponse.redirect(new URL('/crew/today', request.url));
+            if (path === '/') return NextResponse.redirect(new URL('/login', request.url));
+        } else if (path === '/') {
+            return NextResponse.redirect(new URL('/login', request.url));
         }
         return supabaseResponse;
     }

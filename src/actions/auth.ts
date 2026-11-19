@@ -8,7 +8,7 @@ export async function login(formData: FormData) {
   const password = formData.get('password') as string;
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -17,7 +17,23 @@ export async function login(formData: FormData) {
     return { error: error.message };
   }
 
-  redirect('/');
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('app_role')
+    .eq('id', data.user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    return { error: `Signed in, but couldn't load your account role: ${profileError.message}` };
+  }
+
+  if (profile?.app_role === 'admin') redirect('/admin/team');
+  if (profile?.app_role === 'ops') redirect('/ops/calendar');
+  if (profile?.app_role === 'crew') redirect('/crew/today');
+
+  return {
+    error: 'Your account is signed in, but it has no assigned app role. Ask an administrator to check your profile.',
+  };
 }
 
 export async function logout() {

@@ -37,20 +37,30 @@ async function runSeed() {
             email_confirm: true,
         });
 
+        let userId: string;
         if (authError) {
-            console.log(`User ${u.email} might already exist. Skipping auth creation.`);
-            continue;
+            const { data: usersData, error: usersError } = await supabase.auth.admin.listUsers();
+            if (usersError) throw usersError;
+
+            const existingUser = usersData.users.find((user) => user.email === u.email);
+            if (!existingUser) throw authError;
+
+            userId = existingUser.id;
+            console.log(`User ${u.email} already exists. Ensuring profile.`);
+        } else {
+            userId = authData.user.id;
         }
 
-        // Create profile
-        await supabase.from('profiles').insert({
-            id: authData.user.id,
+        const { error: profileError } = await supabase.from('profiles').upsert({
+            id: userId,
             full_name: u.name,
             app_role: u.role,
             crew_role: u.crewRole,
             weekly_off_day: u.offDay,
-        });
-        console.log(`Created user: ${u.email}`);
+        }, { onConflict: 'id', ignoreDuplicates: true });
+
+        if (profileError) throw profileError;
+        console.log(`Ensured profile: ${u.email}`);
     }
 
     // 2. Create Customers
