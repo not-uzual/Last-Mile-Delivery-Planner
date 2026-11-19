@@ -1,5 +1,6 @@
 import LogoutButton from '@/components/LogoutButton';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     return (
@@ -28,7 +29,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </nav>
 
             <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-                {children}
+                <Suspense fallback={<p className="text-gray-600">Loading admin page...</p>}>
+                    {children}
+                </Suspense>
             </main>
         </div>
     );
