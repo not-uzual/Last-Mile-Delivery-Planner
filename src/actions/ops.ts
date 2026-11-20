@@ -96,7 +96,7 @@ export async function rescheduleDelivery(formData: FormData): Promise<ActionResu
   // A new date means the customer has to agree the slot again (the same booking link keeps working).
   const { error } = await supabase
     .from('deliveries')
-    .update({ scheduled_date: date, d4_call_status: 'pending', d1_call_status: 'pending', time_slot: null, slot_booked_at: null, sequence_order: null, trip_number: null, estimated_arrival: null })
+    .update({ scheduled_date: date, d4_call_status: 'pending', d1_call_status: 'pending', time_slot: null, slot_booked_at: null, sequence_order: null, trip_number: null })
     .eq('id', deliveryId);
   if (error) return { ok: false, error: error.message };
   refresh();

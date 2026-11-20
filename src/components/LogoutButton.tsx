@@ -1,14 +1,21 @@
 'use client';
 
+import { useTransition } from 'react';
+import { LogOut } from 'lucide-react';
 import { logout } from '@/actions/auth';
+import { buttonClass } from './ui';
 
 export default function LogoutButton() {
+  const [pending, startTransition] = useTransition();
   return (
     <button
-      onClick={() => logout()}
-      className="text-sm font-medium text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-colors"
+      onClick={() => startTransition(() => logout())}
+      disabled={pending}
+      className={buttonClass('ghost', 'sm')}
+      title="Log out"
     >
-      Log out
+      <LogOut className="size-3.5" aria-hidden />
+      <span className="hidden sm:inline">Log out</span>
     </button>
   );
 }

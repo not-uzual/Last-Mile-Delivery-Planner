@@ -1,45 +1,33 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { DEPOT } from '@/lib/config';
 
-// Fix for default Leaflet marker icons in Next.js
-Reflect.deleteProperty(L.Icon.Default.prototype, '_getIconUrl');
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
-
-// Polyline decoding utility for OpenRouteService geometry
-function decodePolyline(encoded: string) {
-  const points = [];
+/** Decodes an encoded polyline (precision 5), the format OSRM returns. */
+function decodePolyline(encoded: string): [number, number][] {
+  const points: [number, number][] = [];
   let index = 0;
-  const len = encoded.length;
-  let lat = 0, lng = 0;
+  let lat = 0;
+  let lng = 0;
 
-  while (index < len) {
-    let b, shift = 0, result = 0;
-    do {
-      b = encoded.charAt(index++).charCodeAt(0) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-    const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-    lat += dlat;
-
-    shift = 0;
-    result = 0;
-    do {
-      b = encoded.charAt(index++).charCodeAt(0) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-    const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-    lng += dlng;
-
-    points.push([lat / 1E5, lng / 1E5] as [number, number]);
+  while (index < encoded.length) {
+    for (const axis of ['lat', 'lng'] as const) {
+      let b: number;
+      let shift = 0;
+      let result = 0;
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      const delta = result & 1 ? ~(result >> 1) : result >> 1;
+      if (axis === 'lat') lat += delta;
+      else lng += delta;
+    }
+    points.push([lat / 1e5, lng / 1e5]);
   }
   return points;
 }
@@ -47,44 +35,93 @@ function decodePolyline(encoded: string) {
 export type DeliveryPoint = {
   id: string;
   name: string;
+  address?: string;
   lat: number;
   lng: number;
   arrivalTime?: string;
+  status?: 'scheduled' | 'delivered' | 'failed';
 };
 
-export default function RouteMap({ deliveries, geometry }: { deliveries: DeliveryPoint[], geometry: string | null }) {
-  const routePositions = geometry ? decodePolyline(geometry) : [];
-  const center = deliveries.length > 0 
-    ? [deliveries[0].lat, deliveries[0].lng] as [number, number]
-    : [51.5, -0.1] as [number, number];
+const depotIcon = L.divIcon({
+  className: '',
+  html: '<div class="depot-pin"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21V8l9-5 9 5v13"/><path d="M7 21v-8h10v8"/></svg></div>',
+  iconSize: [30, 30],
+  iconAnchor: [15, 15],
+});
+
+function stopIcon(n: number, status?: DeliveryPoint['status']) {
+  const cls = status === 'delivered' ? 'is-done' : status === 'failed' ? 'is-failed' : '';
+  return L.divIcon({
+    className: '',
+    html: `<div class="stop-pin ${cls}">${n}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+  });
+}
+
+function FitBounds({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  const key = points.map((p) => p.join(',')).join('|');
+  useEffect(() => {
+    if (points.length > 1) map.fitBounds(L.latLngBounds(points), { padding: [32, 32] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, key]);
+  return null;
+}
+
+export default function RouteMap({
+  deliveries,
+  geometry,
+  className = 'h-96',
+}: {
+  deliveries: DeliveryPoint[];
+  geometry: string | null;
+  className?: string;
+}) {
+  const route = geometry ? decodePolyline(geometry) : [];
+  const bounds: [number, number][] = [[DEPOT.lat, DEPOT.lng], ...deliveries.map((d) => [d.lat, d.lng] as [number, number])];
 
   return (
-    <div className="h-96 w-full rounded-lg overflow-hidden border shadow-sm">
-      <MapContainer center={center} zoom={11} style={{ height: '100%', width: '100%' }}>
+    <div className={`isolate w-full overflow-hidden ${className}`}>
+      <MapContainer center={[DEPOT.lat, DEPOT.lng]} zoom={11} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
         <TileLayer
-          attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
-        {/* Depot Marker */}
-        <Marker position={[51.5, -0.1]}>
-          <Popup><strong>Depot</strong><br/>Start/End Location</Popup>
+        <FitBounds points={bounds} />
+
+        {route.length > 0 && (
+          <>
+            <Polyline positions={route} pathOptions={{ color: '#ffffff', weight: 7, opacity: 0.9 }} />
+            <Polyline positions={route} pathOptions={{ color: '#82572e', weight: 4, opacity: 0.95 }} />
+          </>
+        )}
+
+        <Marker position={[DEPOT.lat, DEPOT.lng]} icon={depotIcon}>
+          <Popup>
+            <strong>{DEPOT.name}</strong>
+            <br />
+            Start and end of every trip
+          </Popup>
         </Marker>
 
-        {/* Customer Markers */}
         {deliveries.map((d, idx) => (
-          <Marker key={d.id} position={[d.lat, d.lng]}>
+          <Marker key={d.id} position={[d.lat, d.lng]} icon={stopIcon(idx + 1, d.status)}>
             <Popup>
-              <strong>Stop {idx + 1}: {d.name}</strong><br/>
-              Est. Arrival: {d.arrivalTime || 'Pending'}
+              <strong>
+                {idx + 1}. {d.name}
+              </strong>
+              {d.address && (
+                <>
+                  <br />
+                  {d.address}
+                </>
+              )}
+              <br />
+              ETA {d.arrivalTime ?? '—'}
             </Popup>
           </Marker>
         ))}
-
-        {/* Route Line */}
-        {routePositions.length > 0 && (
-          <Polyline positions={routePositions} color="blue" weight={4} opacity={0.6} />
-        )}
       </MapContainer>
     </div>
   );
