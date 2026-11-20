@@ -27,9 +27,9 @@ export async function login(formData: FormData) {
     return { error: `Signed in, but couldn't load your account role: ${profileError.message}` };
   }
 
-  if (profile?.app_role === 'admin') redirect('/admin/team');
-  if (profile?.app_role === 'ops') redirect('/ops/calendar');
-  if (profile?.app_role === 'crew') redirect('/crew/today');
+  if (profile?.app_role === 'admin') redirect('/admin');
+  if (profile?.app_role === 'ops') redirect('/ops');
+  if (profile?.app_role === 'crew') redirect('/crew');
 
   return {
     error: 'Your account is signed in, but it has no assigned app role. Ask an administrator to check your profile.',

@@ -1,62 +1,118 @@
 'use server';
 
-import { createClient } from '@/lib/db/server';
 import { revalidatePath } from 'next/cache';
+import { withRole } from './guard';
+import type { ActionResult } from './types';
+import { loadAvailability } from '@/lib/planning';
+import { formatDate, todayISO } from '@/lib/dates';
+import { orderHandling } from '@/lib/utils';
 
-export async function updateCallStatus(formData: FormData) {
-  const deliveryId = formData.get('deliveryId') as string;
-  const callType = formData.get('callType') as 'd4_call_status' | 'd1_call_status';
-  const status = formData.get('status') as string;
+const CALL_COLUMNS = { d4: 'd4_call_status', d1: 'd1_call_status' } as const;
+const CALL_STATUSES = ['pending', 'confirmed', 'unreachable'] as const;
 
-  const supabase = await createClient();
-  
-  await supabase
-    .from('deliveries')
-    .update({ [callType]: status })
-    .eq('id', deliveryId);
-
-  revalidatePath('/ops/calls');
+function refresh() {
+  revalidatePath('/ops');
+  revalidatePath('/crew');
 }
 
-export async function scheduleOrder(formData: FormData) {
-  const orderId = formData.get('orderId') as string;
-  const scheduledDate = formData.get('scheduledDate') as string;
-  const requiresPorter = formData.get('requiresPorter') === 'true';
+/** Checks a date can take one more delivery: not in the past, not before the order is ready, team working, < 4 booked. */
+async function checkDayAccepts(
+  supabase: Awaited<ReturnType<typeof withRole>>['supabase'],
+  date: string,
+  readyDate: string,
+): Promise<string | null> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return 'Pick a valid date.';
+  if (date < todayISO()) return 'That date is in the past.';
+  if (date < readyDate) return `The order is not ready until ${formatDate(readyDate)}.`;
 
-  const supabase = await createClient();
+  const { days } = await loadAvailability(supabase, [date]);
+  const day = days[0];
+  if (day.status === 'closed') return `${formatDate(date)} is closed – no driver or assembler working.`;
+  if (day.status === 'locked') return `${formatDate(date)} already has 4 deliveries.`;
+  return null;
+}
 
-  // 1. Create the delivery
-  await supabase.from('deliveries').insert({
+export async function updateCallStatus(formData: FormData): Promise<ActionResult> {
+  const { supabase } = await withRole(['ops']);
+  const deliveryId = String(formData.get('deliveryId'));
+  const column = CALL_COLUMNS[String(formData.get('call')) as keyof typeof CALL_COLUMNS];
+  const status = String(formData.get('status')) as (typeof CALL_STATUSES)[number];
+  if (!column || !CALL_STATUSES.includes(status)) return { ok: false, error: 'Invalid call outcome.' };
+
+  const patch = column === 'd4_call_status' ? { d4_call_status: status } : { d1_call_status: status };
+  const { error } = await supabase.from('deliveries').update(patch).eq('id', deliveryId);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true };
+}
+
+export async function scheduleOrder(formData: FormData): Promise<ActionResult> {
+  const { supabase } = await withRole(['ops']);
+  const orderId = String(formData.get('orderId'));
+  const date = String(formData.get('date'));
+
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, status, ready_date, customers(lift_length, lift_width, lift_height, has_staircase_only), order_items(length, width, height, weight)')
+    .eq('id', orderId)
+    .single();
+  if (orderError || !order) return { ok: false, error: 'Order not found.' };
+  if (order.status !== 'unplanned') return { ok: false, error: 'This order is already planned.' };
+
+  const problem = await checkDayAccepts(supabase, date, order.ready_date);
+  if (problem) return { ok: false, error: problem };
+
+  const handling = order.customers ? orderHandling(order.order_items, order.customers) : 'lift';
+
+  const { error } = await supabase.from('deliveries').insert({
     order_id: orderId,
-    scheduled_date: scheduledDate,
-    requires_porter: requiresPorter,
-    status: 'scheduled'
+    scheduled_date: date,
+    requires_porter: handling !== 'lift',
+    status: 'scheduled',
   });
+  if (error) return { ok: false, error: error.message };
 
-  // 2. Update the order status
   await supabase.from('orders').update({ status: 'planned' }).eq('id', orderId);
-
-  revalidatePath('/ops/planning');
-  revalidatePath('/ops/calendar');
-  revalidatePath('/ops/calls');
+  refresh();
+  return { ok: true, message: `Scheduled for ${formatDate(date)}` };
 }
 
-export async function getCalendarData(dates: string[]) {
-  const supabase = await createClient();
+export async function rescheduleDelivery(formData: FormData): Promise<ActionResult> {
+  const { supabase } = await withRole(['ops']);
+  const deliveryId = String(formData.get('deliveryId'));
+  const date = String(formData.get('date'));
 
-  const [teamRes, leavesRes, deliveriesRes] = await Promise.all([
-    supabase.from('profiles').select('id, crew_role, weekly_off_day').eq('app_role', 'crew'),
-    supabase.from('leave_records').select('profile_id, leave_date').in('leave_date', dates),
-    supabase.from('deliveries').select('scheduled_date, id').in('scheduled_date', dates),
-  ]);
+  const { data: delivery } = await supabase
+    .from('deliveries')
+    .select('id, status, scheduled_date, orders(ready_date)')
+    .eq('id', deliveryId)
+    .single();
+  if (!delivery || delivery.status !== 'scheduled') return { ok: false, error: 'Only scheduled deliveries can be moved.' };
+  if (delivery.scheduled_date === date) return { ok: false, error: 'Already on that day.' };
 
-  if (teamRes.error) throw teamRes.error;
-  if (leavesRes.error) throw leavesRes.error;
-  if (deliveriesRes.error) throw deliveriesRes.error;
+  const problem = await checkDayAccepts(supabase, date, delivery.orders?.ready_date ?? date);
+  if (problem) return { ok: false, error: problem };
 
-  return {
-    team: teamRes.data,
-    leaves: leavesRes.data,
-    deliveries: deliveriesRes.data,
-  };
+  // A new date means the customer has to agree the slot again (the same booking link keeps working).
+  const { error } = await supabase
+    .from('deliveries')
+    .update({ scheduled_date: date, d4_call_status: 'pending', d1_call_status: 'pending', time_slot: null, slot_booked_at: null, sequence_order: null, trip_number: null, estimated_arrival: null })
+    .eq('id', deliveryId);
+  if (error) return { ok: false, error: error.message };
+  refresh();
+  return { ok: true, message: `Moved to ${formatDate(date)}` };
+}
+
+export async function unassignDelivery(formData: FormData): Promise<ActionResult> {
+  const { supabase } = await withRole(['ops']);
+  const deliveryId = String(formData.get('deliveryId'));
+
+  const { data: delivery } = await supabase.from('deliveries').select('id, status, order_id').eq('id', deliveryId).single();
+  if (!delivery || delivery.status !== 'scheduled') return { ok: false, error: 'Only scheduled deliveries can be removed.' };
+
+  const { error } = await supabase.from('deliveries').delete().eq('id', deliveryId);
+  if (error) return { ok: false, error: error.message };
+  await supabase.from('orders').update({ status: 'unplanned' }).eq('id', delivery.order_id);
+  refresh();
+  return { ok: true };
 }

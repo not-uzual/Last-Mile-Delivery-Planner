@@ -1,10 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import type { Database } from '@/types/database.types';
 
-export async function middleware(request: NextRequest) {
+const HOME = { admin: '/admin', ops: '/ops', crew: '/crew' } as const;
+
+export async function proxy(request: NextRequest) {
     let supabaseResponse = NextResponse.next({ request });
 
-    const supabase = createServerClient(
+    const supabase = createServerClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
         {
@@ -25,33 +28,30 @@ export async function middleware(request: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser();
     const path = request.nextUrl.pathname;
+    const isLogin = path.startsWith('/login');
 
-    // 1. RBAC
-    if (path === '/' || path.startsWith('/login')) {
-        if (user) {
-            const { data: profile } = await supabase.from('profiles').select('app_role').eq('id', user.id).single();
-            if (profile?.app_role === 'admin') return NextResponse.redirect(new URL('/admin/team', request.url));
-            if (profile?.app_role === 'ops') return NextResponse.redirect(new URL('/ops/calendar', request.url));
-            if (profile?.app_role === 'crew') return NextResponse.redirect(new URL('/crew/today', request.url));
-            if (path === '/') return NextResponse.redirect(new URL('/login', request.url));
-        } else if (path === '/') {
-            return NextResponse.redirect(new URL('/login', request.url));
-        }
-        return supabaseResponse;
-    }
+    // Customer booking links are public: the token in the URL is the only access check.
+    if (path.startsWith('/book/')) return supabaseResponse;
 
-    // 2. Protect all other routes
     if (!user) {
+        if (isLogin) return supabaseResponse;
         return NextResponse.redirect(new URL('/login', request.url));
     }
 
-    // 3. Role-based Route Protection
-    const { data: profile } = await supabase.from('profiles').select('app_role').eq('id', user.id).single();
+    const { data: profile } = await supabase.from('profiles').select('app_role').eq('id', user.id).maybeSingle();
     const role = profile?.app_role;
+    const home = role ? HOME[role] : null;
 
-    if (path.startsWith('/admin') && role !== 'admin') return NextResponse.redirect(new URL('/', request.url));
-    if (path.startsWith('/ops') && role !== 'ops') return NextResponse.redirect(new URL('/', request.url));
-    if (path.startsWith('/crew') && role !== 'crew') return NextResponse.redirect(new URL('/', request.url));
+    // Signed in: send "/" and "/login" to the role's workspace.
+    if (path === '/' || isLogin) {
+        return home ? NextResponse.redirect(new URL(home, request.url)) : supabaseResponse;
+    }
+
+    // Each role may only open its own area.
+    const area = (['admin', 'ops', 'crew'] as const).find((a) => path === `/${a}` || path.startsWith(`/${a}/`));
+    if (area && area !== role) {
+        return NextResponse.redirect(new URL(home ?? '/login', request.url));
+    }
 
     return supabaseResponse;
 }
