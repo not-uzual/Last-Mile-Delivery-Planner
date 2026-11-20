@@ -9,6 +9,7 @@ import { formatDate, todayISO } from '@/lib/dates';
 import { HANDLING_LABEL, cn, itemHandling, orderHandling } from '@/lib/utils';
 import { Badge, Card, EmptyState, Skeleton, buttonClass } from '@/components/ui';
 import StopActions from './stop-actions';
+import TimeOff from '@/components/leave/TimeOff';
 import { SLOT_BY_ID, compareBySlot } from '@/lib/slots';
 
 export const metadata: Metadata = { title: 'Today' };
@@ -189,6 +190,10 @@ async function CrewToday() {
           </ul>
         </Card>
       )}
+
+      <Suspense fallback={<Skeleton className="h-48" />}>
+        <TimeOff />
+      </Suspense>
     </div>
   );
 }

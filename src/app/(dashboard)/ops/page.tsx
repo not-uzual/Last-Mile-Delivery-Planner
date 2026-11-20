@@ -31,6 +31,7 @@ import ActionButton from '@/components/ui/ActionButton';
 import Map from '@/components/map/Map';
 import MoveDelivery from './move-delivery';
 import BookingLink from './booking-link';
+import TimeOff from '@/components/leave/TimeOff';
 import { SLOT_BY_ID, compareBySlot, type TimeSlot } from '@/lib/slots';
 
 export const metadata: Metadata = { title: 'Operations' };
@@ -205,7 +206,8 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
       </Card>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        {/* ---------------- Selected day ---------------- */}
+        {/* ---------------- Left: selected day, then the unplanned queue ---------------- */}
+        <div className="min-w-0 space-y-6">
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3">
             <div>
@@ -335,38 +337,6 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
           )}
         </Card>
 
-        {/* ---------------- Right rail ---------------- */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader icon={Phone} title="Customer calls" description="D-4: send the customer a link to pick their time. D-1: call to reconfirm." />
-            <CallSection title={`D-4 · agree slot for ${formatDate(d4)}`} rows={d4Calls} call="d4" />
-            <CallSection title={`D-1 · reconfirm for ${formatDate(d1)}`} rows={d1Calls} call="d1" />
-            {unconfirmed.length > 0 && (
-              <div className="border-t border-zinc-100">
-                <p className="flex items-center gap-1.5 px-4 pt-3 text-[11px] font-medium uppercase tracking-wide text-rose-600">
-                  <AlertTriangle className="size-3" /> Not confirmed
-                </p>
-                <ul className="divide-y divide-zinc-100">
-                  {unconfirmed.map((c) => {
-                    const call = c.d4_call_status !== 'confirmed' ? 'd4' : 'd1';
-                    return (
-                      <li key={c.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{c.name}</p>
-                          <p className="text-xs text-zinc-500">
-                            <Link href={`?date=${c.scheduled_date}`} scroll={false} className="hover:underline">{relativeDay(c.scheduled_date, today)}</Link>
-                            {' · '}{call === 'd4' ? 'slot never agreed' : 'not reconfirmed'}
-                          </p>
-                        </div>
-                        <CallAction id={c.id} call={call} token={c.booking_token} />
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-          </Card>
-
           <Card>
             <CardHeader
               icon={Inbox}
@@ -416,6 +386,43 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
               </ul>
             )}
           </Card>
+        </div>
+
+        {/* ---------------- Right rail ---------------- */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader icon={Phone} title="Customer calls" description="D-4: send the customer a link to pick their time. D-1: call to reconfirm." />
+            <CallSection title={`D-4 · agree slot for ${formatDate(d4)}`} rows={d4Calls} call="d4" />
+            <CallSection title={`D-1 · reconfirm for ${formatDate(d1)}`} rows={d1Calls} call="d1" />
+            {unconfirmed.length > 0 && (
+              <div className="border-t border-zinc-100">
+                <p className="flex items-center gap-1.5 px-4 pt-3 text-[11px] font-medium uppercase tracking-wide text-rose-600">
+                  <AlertTriangle className="size-3" /> Not confirmed
+                </p>
+                <ul className="divide-y divide-zinc-100">
+                  {unconfirmed.map((c) => {
+                    const call = c.d4_call_status !== 'confirmed' ? 'd4' : 'd1';
+                    return (
+                      <li key={c.id} className="flex items-center justify-between gap-2 px-4 py-2.5">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">{c.name}</p>
+                          <p className="text-xs text-zinc-500">
+                            <Link href={`?date=${c.scheduled_date}`} scroll={false} className="hover:underline">{relativeDay(c.scheduled_date, today)}</Link>
+                            {' · '}{call === 'd4' ? 'slot never agreed' : 'not reconfirmed'}
+                          </p>
+                        </div>
+                        <CallAction id={c.id} call={call} token={c.booking_token} />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+          </Card>
+
+          <Suspense fallback={<Skeleton className="h-48" />}>
+            <TimeOff />
+          </Suspense>
         </div>
       </div>
     </div>

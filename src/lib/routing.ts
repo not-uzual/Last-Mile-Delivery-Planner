@@ -1,66 +1,75 @@
-'use server';
-
-// Depot coordinates (Starting point for the vehicle)
-const DEPOT = { lng: -0.1, lat: 51.5 }; 
+import { DAY_START_MINUTES, DEPOT, SERVICE_MINUTES } from './config';
 
 type OsrmRoute = {
-  legs: { duration: number }[];
+  legs: { duration: number; distance: number }[];
   geometry: string;
   distance: number;
   duration: number;
 };
 
-export async function getRouteForDay(deliveries: { lat: number, lng: number, id: string }[]) {
-  if (deliveries.length === 0) return null;
+export type RouteStop = {
+  id: string;
+  lat: number;
+  lng: number;
+  /** Start of the customer's booked window (minutes after midnight); the crew waits if early. */
+  notBeforeMinutes?: number;
+};
 
-  // OSRM expects coordinates as: lng,lat;lng,lat;lng,lat
-  const coordinatesArray = [
-    [DEPOT.lng, DEPOT.lat], // Start at depot
-    ...deliveries.map(d => [d.lng, d.lat]), // Customer locations
-    [DEPOT.lng, DEPOT.lat]  // Return to depot
-  ];
+export type RoutePlan = {
+  geometry: string;
+  arrivals: { id: string; arrival: string; departure: string }[];
+  returnToDepot: string;
+  distanceKm: number;
+  drivingMinutes: number;
+};
 
-  const coordinatesString = coordinatesArray.map(coord => `${coord[0]},${coord[1]}`).join(';');
+function hhmm(totalMinutes: number) {
+  const m = Math.round(totalMinutes);
+  return `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
 
-  // Fetch from the free public OSRM server
-  const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinatesString}?overview=full`, {
-    method: 'GET',
-    // No headers or API keys needed!
-  });
+/**
+ * Drives depot → stops (in the given order) → depot over real roads using the
+ * free public OSRM server. Arrival at stop N = departure from stop N-1 + road
+ * travel time of that leg (or the start of the customer's booked window, if the
+ * van would be early); departure = arrival + SERVICE_MINUTES.
+ */
+export async function getRouteForDay(stops: RouteStop[]): Promise<RoutePlan | null> {
+  if (stops.length === 0) return null;
 
-  if (!response.ok) {
-    console.error('OSRM Error:', await response.text());
+  const coords = [DEPOT, ...stops, DEPOT].map((p) => `${p.lng},${p.lat}`).join(';');
+
+  try {
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      console.error('OSRM error:', res.status, await res.text());
+      return null;
+    }
+    const data: { routes?: OsrmRoute[] } = await res.json();
+    const route = data.routes?.[0];
+    if (!route) return null;
+
+    let clock = DAY_START_MINUTES;
+    const arrivals = stops.map((stop, i) => {
+      clock += route.legs[i].duration / 60;
+      if (stop.notBeforeMinutes !== undefined) clock = Math.max(clock, stop.notBeforeMinutes);
+      const arrival = hhmm(clock);
+      clock += SERVICE_MINUTES;
+      return { id: stop.id, arrival, departure: hhmm(clock) };
+    });
+    clock += route.legs[stops.length].duration / 60;
+
+    return {
+      geometry: route.geometry,
+      arrivals,
+      returnToDepot: hhmm(clock),
+      distanceKm: route.distance / 1000,
+      drivingMinutes: route.duration / 60,
+    };
+  } catch (err) {
+    console.error('OSRM request failed:', err);
     return null;
   }
-
-  const data: { routes: OsrmRoute[] } = await response.json();
-  const route = data.routes[0];
-  if (!route) return null;
-  
-  // Calculate Arrival Times based on a 09:00 AM start time
-  let currentStartTime = new Date(0);
-  currentStartTime.setHours(9, 0, 0, 0); // 9:00 AM
-  
-  // OSRM breaks the trip into "legs" (point A to B, B to C)
-  const arrivals = deliveries.map((d, index) => {
-    // Add the travel time from this leg (in seconds)
-    const travelTimeSeconds = route.legs[index].duration;
-    currentStartTime = new Date(currentStartTime.getTime() + (travelTimeSeconds * 1000));
-    
-    const arrivalTime = new Date(currentStartTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    // Add 45 mins unloading time before driving to the next stop
-    currentStartTime = new Date(currentStartTime.getTime() + (45 * 60000));
-    
-    return { id: d.id, arrivalTime };
-  });
-
-  return {
-    geometry: route.geometry, // Encoded polyline, exactly the same format we decoded in RouteMap!
-    arrivals,
-    summary: {
-      distance: route.distance, // OSRM returns meters (same as ORS)
-      duration: route.duration  // OSRM returns seconds (same as ORS)
-    }
-  };
 }
