@@ -30,8 +30,28 @@ CREATE POLICY "Authenticated users can read orders" ON orders FOR SELECT TO auth
 CREATE POLICY "Authenticated users can read order_items" ON order_items FOR SELECT TO authenticated USING (true);
 CREATE POLICY "Authenticated users can read deliveries" ON deliveries FOR SELECT TO authenticated USING (true);
 
-CREATE POLICY "Authenticated users can insert/update leave_records" ON leave_records FOR ALL TO authenticated USING (true);
 CREATE POLICY "Authenticated users can insert/update customers" ON customers FOR ALL TO authenticated USING (true);
 CREATE POLICY "Authenticated users can insert/update orders" ON orders FOR ALL TO authenticated USING (true);
 CREATE POLICY "Authenticated users can insert/update order_items" ON order_items FOR ALL TO authenticated USING (true);
 CREATE POLICY "Authenticated users can insert/update deliveries" ON deliveries FOR ALL TO authenticated USING (true);
+
+-- 5. Leave: everyone reads (ops plans with it); writes depend on role.
+--    crew / ops: request a PENDING day for themselves, and withdraw it while it is still pending
+--    admin:      approve or reject a pending request; the decision is final (no edit, no delete)
+CREATE POLICY "Crew and ops request their own leave" ON leave_records
+FOR INSERT TO authenticated
+WITH CHECK (
+    current_app_role() IN ('ops', 'crew')
+    AND profile_id = auth.uid()
+    AND status = 'pending'
+    AND decided_by IS NULL AND decided_at IS NULL
+);
+
+CREATE POLICY "Admin decides pending leave" ON leave_records
+FOR UPDATE TO authenticated
+USING (current_app_role() = 'admin' AND status = 'pending')
+WITH CHECK (current_app_role() = 'admin' AND status IN ('approved', 'rejected') AND decided_by = auth.uid());
+
+CREATE POLICY "Owner withdraws pending leave" ON leave_records
+FOR DELETE TO authenticated
+USING (profile_id = auth.uid() AND status = 'pending');

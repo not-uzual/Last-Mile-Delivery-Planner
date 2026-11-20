@@ -12,13 +12,39 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.18"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       customers: {
         Row: {
           address: string
-          created_at: string | null
-          has_staircase_only: boolean | null
+          created_at: string
+          email: string | null
+          has_staircase_only: boolean
           id: string
           lat: number
           lift_height: number | null
@@ -30,8 +56,9 @@ export type Database = {
         }
         Insert: {
           address: string
-          created_at?: string | null
-          has_staircase_only?: boolean | null
+          created_at?: string
+          email?: string | null
+          has_staircase_only?: boolean
           id?: string
           lat: number
           lift_height?: number | null
@@ -43,8 +70,9 @@ export type Database = {
         }
         Update: {
           address?: string
-          created_at?: string | null
-          has_staircase_only?: boolean | null
+          created_at?: string
+          email?: string | null
+          has_staircase_only?: boolean
           id?: string
           lat?: number
           lift_height?: number | null
@@ -58,53 +86,51 @@ export type Database = {
       }
       deliveries: {
         Row: {
-          created_at: string | null
-          d1_call_status: Database["public"]["Enums"]["call_status_type"] | null
-          d4_call_status: Database["public"]["Enums"]["call_status_type"] | null
-          estimated_arrival: string | null
+          booking_token: string | null
+          created_at: string
+          d1_call_status: Database["public"]["Enums"]["call_status_type"]
+          d4_call_status: Database["public"]["Enums"]["call_status_type"]
           failure_reason: string | null
           id: string
           order_id: string
-          requires_porter: boolean | null
+          requires_porter: boolean
           scheduled_date: string
           sequence_order: number | null
-          status: Database["public"]["Enums"]["delivery_status_type"] | null
+          slot_booked_at: string | null
+          status: Database["public"]["Enums"]["delivery_status_type"]
+          time_slot: Database["public"]["Enums"]["delivery_slot_type"] | null
           trip_number: number | null
         }
         Insert: {
-          created_at?: string | null
-          d1_call_status?:
-            | Database["public"]["Enums"]["call_status_type"]
-            | null
-          d4_call_status?:
-            | Database["public"]["Enums"]["call_status_type"]
-            | null
-          estimated_arrival?: string | null
+          booking_token?: string | null
+          created_at?: string
+          d1_call_status?: Database["public"]["Enums"]["call_status_type"]
+          d4_call_status?: Database["public"]["Enums"]["call_status_type"]
           failure_reason?: string | null
           id?: string
           order_id: string
-          requires_porter?: boolean | null
+          requires_porter?: boolean
           scheduled_date: string
           sequence_order?: number | null
-          status?: Database["public"]["Enums"]["delivery_status_type"] | null
+          slot_booked_at?: string | null
+          status?: Database["public"]["Enums"]["delivery_status_type"]
+          time_slot?: Database["public"]["Enums"]["delivery_slot_type"] | null
           trip_number?: number | null
         }
         Update: {
-          created_at?: string | null
-          d1_call_status?:
-            | Database["public"]["Enums"]["call_status_type"]
-            | null
-          d4_call_status?:
-            | Database["public"]["Enums"]["call_status_type"]
-            | null
-          estimated_arrival?: string | null
+          booking_token?: string | null
+          created_at?: string
+          d1_call_status?: Database["public"]["Enums"]["call_status_type"]
+          d4_call_status?: Database["public"]["Enums"]["call_status_type"]
           failure_reason?: string | null
           id?: string
           order_id?: string
-          requires_porter?: boolean | null
+          requires_porter?: boolean
           scheduled_date?: string
           sequence_order?: number | null
-          status?: Database["public"]["Enums"]["delivery_status_type"] | null
+          slot_booked_at?: string | null
+          status?: Database["public"]["Enums"]["delivery_status_type"]
+          time_slot?: Database["public"]["Enums"]["delivery_slot_type"] | null
           trip_number?: number | null
         }
         Relationships: [
@@ -119,24 +145,43 @@ export type Database = {
       }
       leave_records: {
         Row: {
-          created_at: string | null
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
           id: string
           leave_date: string
           profile_id: string
+          reason: string | null
+          status: Database["public"]["Enums"]["leave_status_type"]
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
           id?: string
           leave_date: string
           profile_id: string
+          reason?: string | null
+          status?: Database["public"]["Enums"]["leave_status_type"]
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
           id?: string
           leave_date?: string
           profile_id?: string
+          reason?: string | null
+          status?: Database["public"]["Enums"]["leave_status_type"]
         }
         Relationships: [
+          {
+            foreignKeyName: "leave_records_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leave_records_profile_id_fkey"
             columns: ["profile_id"]
@@ -148,7 +193,7 @@ export type Database = {
       }
       order_items: {
         Row: {
-          created_at: string | null
+          created_at: string
           height: number
           id: string
           length: number
@@ -158,7 +203,7 @@ export type Database = {
           width: number
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           height: number
           id?: string
           length: number
@@ -168,7 +213,7 @@ export type Database = {
           width: number
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           height?: number
           id?: string
           length?: number
@@ -189,25 +234,25 @@ export type Database = {
       }
       orders: {
         Row: {
-          created_at: string | null
+          created_at: string
           customer_id: string
           id: string
           ready_date: string
-          status: Database["public"]["Enums"]["order_status_type"] | null
+          status: Database["public"]["Enums"]["order_status_type"]
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           customer_id: string
           id?: string
           ready_date: string
-          status?: Database["public"]["Enums"]["order_status_type"] | null
+          status?: Database["public"]["Enums"]["order_status_type"]
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           customer_id?: string
           id?: string
           ready_date?: string
-          status?: Database["public"]["Enums"]["order_status_type"] | null
+          status?: Database["public"]["Enums"]["order_status_type"]
         }
         Relationships: [
           {
@@ -222,7 +267,7 @@ export type Database = {
       profiles: {
         Row: {
           app_role: Database["public"]["Enums"]["app_role_type"]
-          created_at: string | null
+          created_at: string
           crew_role: Database["public"]["Enums"]["crew_role_type"] | null
           full_name: string
           id: string
@@ -230,7 +275,7 @@ export type Database = {
         }
         Insert: {
           app_role: Database["public"]["Enums"]["app_role_type"]
-          created_at?: string | null
+          created_at?: string
           crew_role?: Database["public"]["Enums"]["crew_role_type"] | null
           full_name: string
           id: string
@@ -238,7 +283,7 @@ export type Database = {
         }
         Update: {
           app_role?: Database["public"]["Enums"]["app_role_type"]
-          created_at?: string | null
+          created_at?: string
           crew_role?: Database["public"]["Enums"]["crew_role_type"] | null
           full_name?: string
           id?: string
@@ -251,14 +296,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      book_slot: {
+        Args: {
+          p_slot: Database["public"]["Enums"]["delivery_slot_type"]
+          p_token: string
+        }
+        Returns: Json
+      }
+      current_app_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role_type"]
+      }
+      get_booking: { Args: { p_token: string }; Returns: Json }
+      slot_capacity: { Args: never; Returns: number }
     }
     Enums: {
       app_role_type: "admin" | "ops" | "crew"
       call_status_type: "pending" | "confirmed" | "unreachable"
       crew_role_type: "driver" | "assembler"
+      delivery_slot_type: "morning" | "midday" | "afternoon"
       delivery_status_type: "scheduled" | "delivered" | "failed"
-      order_status_type: "unplanned" | "planned" | "delivered" | "failed"
+      leave_status_type: "pending" | "approved" | "rejected"
+      order_status_type: "unplanned" | "planned" | "delivered"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -384,13 +443,18 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role_type: ["admin", "ops", "crew"],
       call_status_type: ["pending", "confirmed", "unreachable"],
       crew_role_type: ["driver", "assembler"],
+      delivery_slot_type: ["morning", "midday", "afternoon"],
       delivery_status_type: ["scheduled", "delivered", "failed"],
-      order_status_type: ["unplanned", "planned", "delivered", "failed"],
+      leave_status_type: ["pending", "approved", "rejected"],
+      order_status_type: ["unplanned", "planned", "delivered"],
     },
   },
 } as const
