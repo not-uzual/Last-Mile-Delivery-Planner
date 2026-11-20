@@ -33,7 +33,7 @@ export default function LoginPage() {
             <li className="flex gap-3"><ShieldCheck className="size-5 shrink-0 text-brand-100" /> Lift and staircase checks before the pickup leaves.</li>
           </ul>
         </div>
-        <p className="relative text-xs text-zinc-500">Demo environment · all data is synthatic</p>
+        <p className="relative text-xs text-zinc-500">Demo environment · All data is synthatic</p>
       </aside>
 
       {/* Form */}
@@ -78,7 +78,6 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => {
                     if (emailRef.current) emailRef.current.value = a.email;
-                    if (passwordRef.current) passwordRef.current.value = 'pswd123';
                   }}
                   className="flex items-center justify-between rounded-lg px-3 py-2 text-left ring-1 ring-inset ring-zinc-200 transition-colors hover:bg-zinc-50"
                 >
