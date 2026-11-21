@@ -7,6 +7,9 @@
 --                 +------(crew marks failed)----+
 --   delivery: one row per attempt. A failed attempt stays as history (status 'failed' + reason)
 --             and the order goes back to 'unplanned', so a retry is simply a new delivery row.
+--   assembly: tracked on the delivery, separately from the drop-off. The driver marks the drop-off,
+--             then the assembler marks assembled / failed. A failed assembly keeps its note and stays
+--             in the assembler's queue until it is marked assembled.
 --
 
 -- ─── Enums ───────────────────────────────────────────────────────────────────
@@ -17,6 +20,7 @@ CREATE TYPE delivery_status_type AS ENUM ('scheduled', 'delivered', 'failed');
 CREATE TYPE call_status_type     AS ENUM ('pending', 'confirmed', 'unreachable');
 CREATE TYPE delivery_slot_type   AS ENUM ('morning', 'midday', 'afternoon');
 CREATE TYPE leave_status_type    AS ENUM ('pending', 'approved', 'rejected');
+CREATE TYPE assembly_status_type AS ENUM ('pending', 'assembled', 'failed');
 
 -- ─── 1. Team ─────────────────────────────────────────────────────────────────
 CREATE TABLE profiles (
@@ -122,11 +126,21 @@ CREATE TABLE deliveries (
     sequence_order  INTEGER CHECK (sequence_order > 0),
     requires_porter BOOLEAN NOT NULL DEFAULT false,                           
 
+    -- assembly (assembler's step, after the driver's drop-off)
+    assembly_status assembly_status_type NOT NULL DEFAULT 'pending',
+    assembly_note   TEXT,                                                     -- why the last try failed
+    assembled_at    TIMESTAMPTZ,
+
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT failed_needs_reason CHECK (status <> 'failed' OR failure_reason IS NOT NULL)
+    CONSTRAINT failed_needs_reason CHECK (status <> 'failed' OR failure_reason IS NOT NULL),
+    CONSTRAINT assembly_after_drop_off CHECK (assembly_status = 'pending' OR status = 'delivered'),
+    CONSTRAINT failed_assembly_needs_note CHECK (assembly_status <> 'failed' OR assembly_note IS NOT NULL),
+    CONSTRAINT assembled_has_time CHECK ((assembly_status = 'assembled') = (assembled_at IS NOT NULL))
 );
 CREATE INDEX deliveries_date_idx ON deliveries (scheduled_date);
+-- the assembler's "needs another try" list
+CREATE INDEX deliveries_assembly_failed_idx ON deliveries (scheduled_date) WHERE assembly_status = 'failed';
 -- an order can have many failed attempts but only one live (scheduled or delivered) delivery
 CREATE UNIQUE INDEX deliveries_one_active_per_order ON deliveries (order_id) WHERE status <> 'failed';
 

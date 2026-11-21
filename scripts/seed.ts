@@ -12,7 +12,7 @@
  * Team: 1 admin, 3 ops, 1 driver, 3 assemblers (password = SEED_PASSWORD).
  *
  * Calendar it produces (T = today, horizon T … T+13):
- *   T     open   3/4  delivered + failed + 2 scheduled (one without D-1 confirmation)
+ *   T     open   3/4  delivered (waiting for assembly) + failed + 2 scheduled (one without D-1 confirmation)
  *   T+1   open   3/4  D-1 call list: confirmed / pending / unreachable (+ link that is too late to change)
  *   T+2   CLOSED      no driver: Arthur's weekly day off
  *   T+3   open   2/4  one customer missed the D-4 call (unconfirmed)
@@ -25,6 +25,9 @@
  *   T+10  CLOSED      no assembler: one weekly off + two on leave
  *   T+11  open        Sam weekly off + Bobby on leave, Priya covers
  *   T+12  CLOSED      no assembler: Bobby weekly off + Priya and Sam on leave
+ *
+ * Assembly: T-3 has one assembled and one FAILED assembly (missing parts), which stays in
+ * the assembler's queue on the crew screen until it is marked assembled.
  *
  * Leave inbox: 4 pending requests (one would close a day with 3 deliveries, one is from ops,
  * one is beyond the 14-day grid) and 1 rejected request.
@@ -126,6 +129,8 @@ type DeliverySpec = {
     d4?: Call;
     d1?: Call;
     link?: boolean;                     // create a booking link
+    assembly?: 'assembled' | 'failed';  // only after a drop-off
+    assemblyNote?: string;
 };
 type OrderSpec = {
     note: string;
@@ -147,8 +152,8 @@ const customers: Record<string, { lift: [number, number, number] | null; email?:
 
 const orders: OrderSpec[] = [
     // ── History ──
-    { note: 'delivered last week', customer: 'c1', ready: -6, items: [I.table, I.chair, I.chair], deliveries: [{ on: -3, status: 'delivered', slot: 'morning', d4: 'confirmed', d1: 'confirmed' }] },
-    { note: 'delivered last week, staircase carry', customer: 'c3', ready: -5, items: [I.bookcase], deliveries: [{ on: -3, status: 'delivered', d4: 'confirmed', d1: 'confirmed' }] },
+    { note: 'delivered last week', customer: 'c1', ready: -6, items: [I.table, I.chair, I.chair], deliveries: [{ on: -3, status: 'delivered', slot: 'morning', d4: 'confirmed', d1: 'confirmed', assembly: 'assembled' }] },
+    { note: 'delivered, staircase carry, assembly FAILED → back in assembler queue', customer: 'c3', ready: -5, items: [I.bookcase], deliveries: [{ on: -3, status: 'delivered', d4: 'confirmed', d1: 'confirmed', assembly: 'failed', assemblyNote: 'Missing two shelf brackets' }] },
 
     // ── Today (crew screen) ──
     { note: 'today: delivered', customer: 'c2', ready: -3, items: [I.desk, I.chair], deliveries: [{ on: 0, status: 'delivered', slot: 'morning', d4: 'confirmed', d1: 'confirmed' }] },
@@ -324,6 +329,9 @@ async function runSeed() {
                     time_slot: d.slot ?? null,
                     slot_booked_at: d.slot ? new Date().toISOString() : null,
                     requires_porter: requiresPorter,
+                    assembly_status: d.assembly ?? 'pending',
+                    assembly_note: d.assemblyNote ?? null,
+                    assembled_at: d.assembly === 'assembled' ? new Date().toISOString() : null,
                 }),
                 `delivery "${o.note}"`,
             );

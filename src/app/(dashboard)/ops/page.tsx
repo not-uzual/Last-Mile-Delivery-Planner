@@ -17,6 +17,7 @@ import {
   Truck,
   Undo2,
   Users,
+  Wrench,
   XCircle,
 } from 'lucide-react';
 import { createClient } from '@/lib/db/server';
@@ -75,7 +76,7 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
     supabase
       .from('deliveries')
       .select(
-        'id, status, d4_call_status, d1_call_status, time_slot, failure_reason, orders(id, ready_date, customers(name, address, phone, lat, lng, lift_length, lift_width, lift_height, has_staircase_only), order_items(id, name, length, width, height, weight))',
+        'id, status, d4_call_status, d1_call_status, time_slot, failure_reason, assembly_status, assembly_note, orders(id, ready_date, customers(name, address, phone, lat, lng, lift_length, lift_width, lift_height, has_staircase_only), order_items(id, name, length, width, height, weight))',
       )
       .eq('scheduled_date', selected)
       .order('sequence_order', { nullsFirst: false })
@@ -288,6 +289,8 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
                             </span>
                           )}
                           {s.status === 'delivered' && <Badge tone="green" icon={CheckCircle2}>Delivered</Badge>}
+                          {s.status === 'delivered' && s.assembly_status === 'assembled' && <Badge tone="green" icon={Wrench}>Assembled</Badge>}
+                          {s.assembly_status === 'failed' && <Badge tone="red" icon={Wrench} title={s.assembly_note ?? undefined}>Assembly failed</Badge>}
                           {over && <Badge tone="red" icon={AlertTriangle}>Over capacity</Badge>}
                         </div>
                         <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-zinc-500">

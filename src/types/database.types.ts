@@ -86,6 +86,9 @@ export type Database = {
       }
       deliveries: {
         Row: {
+          assembled_at: string | null
+          assembly_note: string | null
+          assembly_status: Database["public"]["Enums"]["assembly_status_type"]
           booking_token: string | null
           created_at: string
           d1_call_status: Database["public"]["Enums"]["call_status_type"]
@@ -102,6 +105,9 @@ export type Database = {
           trip_number: number | null
         }
         Insert: {
+          assembled_at?: string | null
+          assembly_note?: string | null
+          assembly_status?: Database["public"]["Enums"]["assembly_status_type"]
           booking_token?: string | null
           created_at?: string
           d1_call_status?: Database["public"]["Enums"]["call_status_type"]
@@ -118,6 +124,9 @@ export type Database = {
           trip_number?: number | null
         }
         Update: {
+          assembled_at?: string | null
+          assembly_note?: string | null
+          assembly_status?: Database["public"]["Enums"]["assembly_status_type"]
           booking_token?: string | null
           created_at?: string
           d1_call_status?: Database["public"]["Enums"]["call_status_type"]
@@ -312,6 +321,7 @@ export type Database = {
     }
     Enums: {
       app_role_type: "admin" | "ops" | "crew"
+      assembly_status_type: "pending" | "assembled" | "failed"
       call_status_type: "pending" | "confirmed" | "unreachable"
       crew_role_type: "driver" | "assembler"
       delivery_slot_type: "morning" | "midday" | "afternoon"
@@ -449,6 +459,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role_type: ["admin", "ops", "crew"],
+      assembly_status_type: ["pending", "assembled", "failed"],
       call_status_type: ["pending", "confirmed", "unreachable"],
       crew_role_type: ["driver", "assembler"],
       delivery_slot_type: ["morning", "midday", "afternoon"],
