@@ -20,10 +20,10 @@ export default function RequestLeaveForm({ min, max }: { min: string; max: strin
       <div className="grid gap-3 sm:grid-cols-[160px_minmax(0,1fr)]">
         <label className="block">
           <span className="text-xs font-medium text-zinc-700">Day</span>
-          <input type="date" name="date" min={min} max={max} required className={`${inputClass} mt-1`} />
+          <input type="date" name="date" min={min} max={max} defaultValue={min} required className={`${inputClass} mt-1`} />
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-zinc-700">Reason <span className="font-normal text-zinc-400">(optional)</span></span>
+          <span className="text-xs font-medium text-zinc-700">Reason <span className="font-normal text-zinc-400">(mendatory)</span></span>
           <input name="reason" maxLength={200} placeholder="e.g. doctor’s appointment" className={`${inputClass} mt-1`} />
         </label>
       </div>

@@ -164,7 +164,7 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
         </div>
         <div className="flex items-center gap-3 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5"><Dot tone="green" /> Open</span>
-          <span className="flex items-center gap-1.5"><Dot tone="amber" /> Locked (4/4)</span>
+          <span className="flex items-center gap-1.5"><Dot tone="amber" /> Locked</span>
           <span className="flex items-center gap-1.5"><Dot tone="red" /> Closed (team off)</span>
         </div>
       </div>
@@ -172,8 +172,8 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Unplanned orders" value={queue.length} hint={`${readyNow} ready to ship now`} icon={Inbox} tone="brand" />
-        <StatCard label="Booked · next 14 days" value={<>{booked}<span className="text-sm font-normal text-zinc-400"> / {slots}</span></>} hint={`${horizonDays.filter((d) => d.status === 'open').length} days still open`} icon={CalendarDays} tone="blue" />
-        <StatCard label="Calls today" value={<>{callsDone}<span className="text-sm font-normal text-zinc-400"> / {d4Calls.length + d1Calls.length}</span></>} hint={unconfirmed.length ? `${unconfirmed.length} customer${unconfirmed.length > 1 ? 's' : ''} not confirmed` : 'Everyone confirmed'} icon={PhoneCall} tone={unconfirmed.length ? 'amber' : 'green'} />
+        <StatCard label="Booked for next 14 days" value={<>{booked}<span className="text-sm font-normal text-zinc-400"> / {slots}</span></>} hint={`${horizonDays.filter((d) => d.status === 'open').length} days still open`} icon={CalendarDays} tone="blue" />
+        <StatCard label="Calls done for today" value={<>{callsDone}<span className="text-sm font-normal text-zinc-400"> / {d4Calls.length + d1Calls.length}</span></>} hint={unconfirmed.length ? `${unconfirmed.length} customer${unconfirmed.length > 1 ? 's' : ''} not confirmed` : 'Everyone confirmed'} icon={PhoneCall} tone={unconfirmed.length ? 'amber' : 'green'} />
         <StatCard
           label="Crew today"
           value={<>{todayAvail.onDuty.length}<span className="text-sm font-normal text-zinc-400"> on duty</span></>}
@@ -197,7 +197,7 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
 
       {/* 14-day calendar strip */}
       <Card>
-        <CardHeader icon={CalendarDays} title="Next 14 days" description="Pick a day to plan it. A day takes at most 4 deliveries and closes when no driver or no assembler is working." />
+        <CardHeader icon={CalendarDays} title="Day Planner" description="Pick any day in next 14 days to plan it." />
         <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-4 md:grid-cols-7">
           {horizonDays.map((d) => (
             <DayTile key={d.date} day={d} today={today} selected={d.date === selected} />
@@ -206,7 +206,7 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
       </Card>
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        {/* ---------------- Left: selected day, then the unplanned queue ---------------- */}
+
         <div className="min-w-0 space-y-6">
         <Card className="overflow-hidden">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3">
@@ -391,13 +391,13 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
         {/* ---------------- Right rail ---------------- */}
         <div className="space-y-6">
           <Card>
-            <CardHeader icon={Phone} title="Customer calls" description="D-4: send the customer a link to pick their time. D-1: call to reconfirm." />
-            <CallSection title={`D-4 · agree slot for ${formatDate(d4)}`} rows={d4Calls} call="d4" />
-            <CallSection title={`D-1 · reconfirm for ${formatDate(d1)}`} rows={d1Calls} call="d1" />
+            <CardHeader icon={Phone} title="Customer calls" description="Agree the slot and reconfirm." />
+            <CallSection title={`D4: agree slot for ${formatDate(d4)}`} rows={d4Calls} call="d4" />
+            <CallSection title={`D1: reconfirm for ${formatDate(d1)}`} rows={d1Calls} call="d1" />
             {unconfirmed.length > 0 && (
               <div className="border-t border-zinc-100">
                 <p className="flex items-center gap-1.5 px-4 pt-3 text-[11px] font-medium uppercase tracking-wide text-rose-600">
-                  <AlertTriangle className="size-3" /> Not confirmed
+                  <AlertTriangle className="size-3" /> Not confirmed - Need look
                 </p>
                 <ul className="divide-y divide-zinc-100">
                   {unconfirmed.map((c) => {
@@ -408,7 +408,7 @@ async function OpsWorkspace({ searchParams }: { searchParams: SearchParams }) {
                           <p className="truncate text-sm font-medium">{c.name}</p>
                           <p className="text-xs text-zinc-500">
                             <Link href={`?date=${c.scheduled_date}`} scroll={false} className="hover:underline">{relativeDay(c.scheduled_date, today)}</Link>
-                            {' · '}{call === 'd4' ? 'slot never agreed' : 'not reconfirmed'}
+                            {' : '}{call === 'd4' ? 'slot never agreed' : 'not reconfirmed'}
                           </p>
                         </div>
                         <CallAction id={c.id} call={call} token={c.booking_token} />
@@ -460,7 +460,7 @@ function DayTile({ day, today, selected }: { day: DayAvailability; today: string
         ))}
       </div>
       <p className={cn('mt-1.5 text-[11px]', day.status === 'closed' ? 'text-rose-600' : day.status === 'locked' ? 'text-amber-700' : 'text-zinc-500')}>
-        {day.status === 'closed' ? (day.overflow ? `Closed · ${day.overflow} to move` : 'Closed') : day.status === 'locked' ? 'Full' : `${MAX_DELIVERIES_PER_DAY - day.deliveryCount} free`}
+        {day.status === 'closed' ? (day.overflow ? `Closed · ${day.overflow} to move` : 'Closed') : day.status === 'locked' ? 'Locked' : `${MAX_DELIVERIES_PER_DAY - day.deliveryCount} free`}
       </p>
     </Link>
   );

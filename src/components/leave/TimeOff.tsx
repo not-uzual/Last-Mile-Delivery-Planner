@@ -8,7 +8,7 @@ import ActionButton from '@/components/ui/ActionButton';
 import RequestLeaveForm from './RequestLeaveForm';
 
 const STATUS: Record<'pending' | 'approved' | 'rejected', { label: string; tone: Tone }> = {
-  pending: { label: 'Waiting for admin', tone: 'amber' },
+  pending: { label: 'Waiting for admin approval', tone: 'amber' },
   approved: { label: 'Approved', tone: 'green' },
   rejected: { label: 'Rejected', tone: 'red' },
 };
@@ -30,7 +30,7 @@ export default async function TimeOff() {
 
   return (
     <Card>
-      <CardHeader icon={CalendarOff} title="Time off" description="Ask for a single day off. It counts once the admin approves it." />
+      <CardHeader icon={CalendarOff} title="Request Leave" description="Ask for a one day off." />
       <RequestLeaveForm min={addDays(today, 1)} max={addDays(today, 90)} />
       {data.length > 0 && (
         <ul className="divide-y divide-zinc-100 border-t border-zinc-100">

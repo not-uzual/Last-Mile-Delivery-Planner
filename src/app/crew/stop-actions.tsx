@@ -8,7 +8,7 @@ import { buttonClass, inputClass } from '@/components/ui';
 
 const REASONS = ['Customer not home', 'Item doesn’t fit', 'Access blocked', 'Item damaged', 'Customer refused'];
 
-export default function StopActions({ deliveryId }: { deliveryId: string }) {
+export default function StopActions({ deliveryId, crewRole }: { deliveryId: string; crewRole: 'driver' | 'assembler' | null }) {
   const [failing, setFailing] = useState(false);
   const [reason, setReason] = useState('');
   const [state, action, pending] = useActionState<ActionResult, FormData>((_p, fd) => updateDeliveryStatus(fd), null);
@@ -48,7 +48,7 @@ export default function StopActions({ deliveryId }: { deliveryId: string }) {
             Failed
           </button>
           <button type="submit" name="status" value="delivered" disabled={pending} className={buttonClass('success', 'lg')}>
-            {pending ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />} Delivered
+            {pending ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />} {crewRole === 'assembler' ? 'Assembled' : 'Delivered'}
           </button>
         </div>
       )}

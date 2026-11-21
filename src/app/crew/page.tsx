@@ -30,8 +30,7 @@ export default function CrewPage() {
 }
 
 async function CrewToday() {
-  // Mark the page as request-time before reading the clock: 'today' must be the real today,
-  // not the moment the page was prerendered at build time.
+
   await connection();
   const supabase = await createClient();
   const today = todayISO();
@@ -74,7 +73,7 @@ async function CrewToday() {
           <p className="text-2xl font-semibold tracking-tight">
             {pending.length} <span className="text-base font-normal text-zinc-400">of {stops.length} stops left</span>
           </p>
-          {route && <p className="text-xs tabular-nums text-zinc-400">Back ~{route.returnToDepot}</p>}
+          {route && <p className="text-xs tabular-nums text-zinc-400">Back to depot by {route.returnToDepot}</p>}
         </div>
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-700">
           <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
@@ -125,7 +124,6 @@ async function CrewToday() {
                   <MapPin className="mt-0.5 size-4 shrink-0 text-zinc-400" /> {s.customer.address}
                 </p>
               </div>
-              {s.d1_call_status === 'confirmed' ? <Badge tone="green">Confirmed</Badge> : <Badge tone="amber">Not reconfirmed</Badge>}
             </div>
 
             <div className="grid grid-cols-2 gap-2 px-4">
@@ -167,7 +165,7 @@ async function CrewToday() {
             </ul>
 
             <div className="p-4">
-              <StopActions deliveryId={s.id} />
+              <StopActions deliveryId={s.id} crewRole={profile?.crew_role ?? null} />
             </div>
           </Card>
         );

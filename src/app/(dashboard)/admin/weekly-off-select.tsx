@@ -24,7 +24,7 @@ export default function WeeklyOffSelect({ id, value }: { id: string; value: numb
         }}
         className="h-8 rounded-md border-0 bg-white py-0 pl-2.5 pr-8 text-xs text-zinc-800 ring-1 ring-inset ring-zinc-200 focus:ring-2 focus:ring-zinc-900"
       >
-        <option value="">No fixed day</option>
+        <option value="">No off day</option>
         {WEEKDAYS.map((d, i) => (
           <option key={d} value={i}>{d}</option>
         ))}

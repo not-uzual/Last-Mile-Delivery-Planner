@@ -23,13 +23,12 @@ export default function AdminPage() {
 }
 
 async function AdminConsole() {
-  // Mark the page as request-time before reading the clock: 'today' must be the real today,
-  // not the moment the page was prerendered at build time.
+
   await connection();
   const supabase = await createClient();
   const today = todayISO();
   const horizon = nextDays(today, 14);
-  // The coverage grid also shows the last 3 days so admin can see who was just off.
+
   const PAST_DAYS = 3;
   const gridDates = nextDays(addDays(today, -PAST_DAYS), PAST_DAYS + 14);
 
@@ -38,7 +37,6 @@ async function AdminConsole() {
     supabase.from('profiles').select('id, full_name, app_role, crew_role, weekly_off_day').order('app_role').order('full_name'),
     supabase
       .from('leave_records')
-      // leave_records has two links to profiles (who is off / who decided), so name the one we want
       .select('id, leave_date, profile_id, status, reason, created_at, profiles!leave_records_profile_id_fkey(full_name, app_role, crew_role)')
       .gte('leave_date', today)
       .eq('status', 'pending')
@@ -47,14 +45,13 @@ async function AdminConsole() {
   if (teamRes.error) throw teamRes.error;
   if (leaveRes.error) throw leaveRes.error;
 
-  const days = gridDays.filter((d) => d.date >= today); // today + next 13, for the stats
+  const days = gridDays.filter((d) => d.date >= today);
   const todayDay = days[0];
   const closedDays = days.filter((d) => d.status === 'closed');
-  // Admin is not on the leave system: no leave, no weekly day off, not in the coverage grid.
+  
   const rota = teamRes.data.filter((m) => m.app_role !== 'admin');
-  const requests = leaveRes.data; // approved leave is final and shows in the coverage grid
+  const requests = leaveRes.data;
 
-  // Requests can be further out than the 14-day grid; load availability for those days too.
   const extraDates = [...new Set(requests.map((r) => r.leave_date))].filter((d) => !horizon.includes(d));
   const extra = extraDates.length ? await loadAvailability(supabase, extraDates) : null;
   const allDays = [...days, ...(extra?.days ?? [])];
@@ -71,12 +68,12 @@ async function AdminConsole() {
         <StatCard label="Crew members" value={crew.length} hint={`${crew.filter((c) => c.crew_role === 'driver').length} driver · ${crew.filter((c) => c.crew_role === 'assembler').length} assemblers`} icon={Users} tone="brand" />
         <StatCard label="On duty today" value={todayDay.onDuty.length} hint={todayDay.status === 'closed' ? 'Deliveries closed today' : 'Team can deliver today'} icon={UserCheck} tone={todayDay.status === 'closed' ? 'red' : 'green'} />
         <StatCard label="Off today" value={todayDay.off.length} hint={todayDay.off.map((o) => o.member.full_name).join(', ') || 'Nobody'} icon={Plane} tone="amber" />
-        <StatCard label="Closed days · next 14" value={closedDays.length} hint={closedDays.slice(0, 3).map((d) => formatDate(d.date, { weekday: 'short', day: 'numeric' })).join(', ') || 'None'} icon={CalendarDays} tone={closedDays.length ? 'red' : 'neutral'} />
+        <StatCard label="Closed days" value={closedDays.length} hint={closedDays.slice(0, 3).map((d) => formatDate(d.date, { weekday: 'short', day: 'numeric' })).join(', ') || 'None'} icon={CalendarDays} tone={closedDays.length ? 'red' : 'neutral'} />
       </div>
 
       {/* Coverage grid */}
       <Card className="overflow-hidden">
-        <CardHeader icon={CalendarClock} title="Team coverage · last 3 days and next 14" description="A day closes when all drivers or all assemblers are off. Dashed = asked for, not approved yet." />
+        <CardHeader icon={CalendarClock} title="Team Calendar" description="Track past 3 days plus 14 days team status." />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1040px] border-separate border-spacing-0 text-xs">
             <thead>
@@ -105,7 +102,7 @@ async function AdminConsole() {
                       {m.crew_role === 'driver' ? <Truck className="size-3.5 text-zinc-400" /> : m.crew_role === 'assembler' ? <Wrench className="size-3.5 text-zinc-400" /> : <Users className="size-3.5 text-zinc-400" />}
                       <span>
                         <span className="font-medium text-zinc-900">{m.full_name}</span>
-                        <span className="ml-1.5 text-[10px] capitalize text-zinc-400">{m.app_role === 'ops' ? 'Operations' : m.app_role === 'admin' ? 'Admin' : m.crew_role}</span>
+                        <span className="ml-1.5 text-[10px] text-zinc-400">{m.app_role === 'ops' ? 'Operations' : m.app_role === 'admin' ? 'Admin' : m.crew_role ? m.crew_role.charAt(0).toUpperCase() + m.crew_role.slice(1) : ''}</span>
                       </span>
                     </div>
                   </td>
@@ -115,7 +112,7 @@ async function AdminConsole() {
                     return (
                       <td key={d.date} className={cn('border-t border-zinc-100 px-1 py-1.5 text-center', d.date < today && 'opacity-70', d.date === today && 'border-l-2 border-l-blue-400')}>
                         <span
-                          title={reason === 'leave' ? 'On leave' : reason === 'weekly-off' ? 'Weekly day off' : requested ? 'Asked for this day off (pending)' : 'Working'}
+                          title={reason === 'leave' ? 'On leave' : reason === 'weekly-off' ? 'Weekly day off' : requested ? 'Leave asked' : 'Working'}
                           className={cn(
                             'mx-auto grid h-6 w-full max-w-11 place-items-center rounded-md text-[10px] font-medium',
                             reason === 'leave'
@@ -138,7 +135,7 @@ async function AdminConsole() {
                 <td className="sticky left-0 z-10 border-t border-zinc-200 bg-zinc-50 px-4 py-2 font-medium text-zinc-600">Day status</td>
                 {gridDays.map((d) => (
                   <td key={d.date} className={cn('border-t border-zinc-200 bg-zinc-50 px-1 py-2 text-center', d.date < today && 'opacity-70', d.date === today && 'border-l-2 border-l-blue-400')}>
-                    <Badge tone={d.status === 'closed' ? 'red' : d.status === 'locked' ? 'amber' : 'green'}>{d.status === 'closed' ? 'Closed' : d.status === 'locked' ? 'Full' : 'Open'}</Badge>
+                    <Badge tone={d.status === 'closed' ? 'red' : d.status === 'locked' ? 'amber' : 'green'}>{d.status === 'closed' ? 'Closed' : d.status === 'locked' ? 'Locked' : 'Open'}</Badge>
                   </td>
                 ))}
               </tr>
@@ -149,7 +146,7 @@ async function AdminConsole() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Card className="overflow-hidden">
-          <CardHeader icon={Users} title="Team" description="Set each team member's weekly day off. Changes save immediately." />
+          <CardHeader icon={Users} title="Team" description="See all team members and set their week day off." />
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-zinc-50/70 text-left text-xs text-zinc-500">
@@ -176,7 +173,7 @@ async function AdminConsole() {
                         {reason ? <Badge tone="amber">{reason === 'leave' ? 'On leave' : 'Day off'}</Badge> : <Badge tone="green">On duty</Badge>}
                       </td>
                       <td className="px-4 py-2">
-                        {m.app_role === 'admin' ? <span className="text-xs text-zinc-400">—</span> : <WeeklyOffSelect id={m.id} value={m.weekly_off_day} />}
+                        {m.app_role === 'admin' ? <span className="text-xs text-zinc-400">---</span> : <WeeklyOffSelect id={m.id} value={m.weekly_off_day} />}
                       </td>
                     </tr>
                   );
@@ -186,14 +183,13 @@ async function AdminConsole() {
           </div>
         </Card>
 
-        {/* Leave requests waiting for a decision (approved leave shows in the coverage grid).
-            On large screens the card is pinned to the Team card's height and scrolls inside. */}
+        
         <div className="relative min-h-80">
           <Card className="flex flex-col overflow-hidden lg:absolute lg:inset-0">
             <CardHeader
               icon={Plane}
-              title={<>Leave requests <span className="ml-1 font-normal text-zinc-400">{requests.length}</span></>}
-              description="One-day requests from crew and ops. Approval is final, so check what it does to deliveries first."
+              title={<> Leave requests </>}
+              description={`Pending request: ${requests.length} - Check calendar before approving leave.`}
             />
             {requests.length === 0 ? (
               <p className="px-4 py-6 text-center text-xs text-zinc-400">No requests waiting.</p>
@@ -206,7 +202,7 @@ async function AdminConsole() {
                       <div className="min-w-0">
                         <p className="text-sm font-medium">
                           {r.profiles?.full_name}
-                          <span className="ml-1.5 text-xs font-normal capitalize text-zinc-500">{r.profiles?.crew_role ?? 'operations'}</span>
+                          <span className="ml-1.5 text-xs font-normal text-zinc-500">{r.profiles?.crew_role ? r.profiles.crew_role.charAt(0).toUpperCase() + r.profiles.crew_role.slice(1) : 'Operations'}</span>
                         </p>
                         <p className="text-xs text-zinc-500">
                           {formatDate(r.leave_date, { weekday: 'long', day: 'numeric', month: 'short' })}
@@ -227,7 +223,6 @@ async function AdminConsole() {
                 })}
               </ul>
             )}
-
           </Card>
         </div>
       </div>
